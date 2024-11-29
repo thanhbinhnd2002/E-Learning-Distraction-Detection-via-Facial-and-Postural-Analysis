@@ -2,13 +2,13 @@ import os
 import shutil
 
 # Đường dẫn đến thư mục Input
-input_folder = "/home/binh/Workspace/projects/OpenFace/build/bin/Input/"
+input_folder = "/home/binh/Output"
 
 # Tạo danh sách chứa đường dẫn đến tất cả các video
 video_files = []
 for root, dirs, files in os.walk(input_folder):
     for file in files:
-        if file.lower().endswith(('.mp4', '.avi', '.mkv')):
+        if file.lower().endswith(('.csv')):
             video_files.append(os.path.join(root, file))
 
 # Đường dẫn mới cho tất cả các video
