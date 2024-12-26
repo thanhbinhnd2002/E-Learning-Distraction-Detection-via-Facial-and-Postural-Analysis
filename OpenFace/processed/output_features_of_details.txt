@@ -1,0 +1,13 @@
+Input:/home/binh/Workspace/data/data_science/data_raw_1/video_40/video_40_video_4.mp4
+Input full path:/home/binh/Workspace/data/data_science/data_raw_1/video_40/video_40_video_4.mp4
+Camera parameters:1312.5,1312.5,960,540
+Output HOG:output_features.hog
+Output video:output_features.avi
+Output aligned directory:output_features_aligned
+Output csv:output_features.csv
+Gaze: 1
+AUs: 1
+Landmarks 2D: 1
+Landmarks 3D: 1
+Pose: 1
+Shape parameters: 1

@@ -1,20 +1,25 @@
 import pandas as pd
-import numpy as np
 
-# Đọc file CSV
-file_path = "/home/binh/Output/Final_Data/processed_features.csv"  # Thay bằng đường dẫn file CSV của bạn
-df = pd.read_csv(file_path)
+def label_driver(input_csv, output_csv):
+    # Đọc file CSV
+    df = pd.read_csv(input_csv)
 
-# Tạo cột Label với giá trị ngẫu nhiên (0 hoặc 1)
-np.random.seed(42)  # Đặt seed để đảm bảo kết quả tái hiện được
-df['Label'] = np.random.choice([0, 1], size=len(df), p=[0.5, 0.5])  # Tỷ lệ 50:50
+    # Kiểm tra nếu cột 'video_name' tồn tại
+    if 'video_name' in df.columns:
+        # Kiểm tra cột 'video_name' và đánh nhãn
+        df['label_1'] = df['video_name'].apply(lambda x: 1 if 'driver' in str(x).lower() else 0)
+    else:
+        print("Cột 'video_name' không tồn tại trong file CSV.")
+        return
 
-# Kiểm tra tỷ lệ nhãn
-label_counts = df['Label'].value_counts(normalize=True)
-print("Tỷ lệ nhãn (0 và 1):")
-print(label_counts)
+    # Lưu lại file CSV đã đánh nhãn, chỉ giữ các cột cần thiết
+    df = df[['video_name', 'label_1'],]  # Chỉ giữ lại cột 'video_name' và 'label_1'
+    df.to_csv(output_csv, index=False)
 
-# Lưu file mới
-output_path = "labeled_file_random.csv"
-df.to_csv(output_path, index=False)
-print(f"File đã được lưu với nhãn tại: {output_path}")
+    print(f"File đã được đánh nhãn và lưu tại {output_csv}")
+
+# Sử dụng hàm
+# Thay 'input.csv' bằng đường dẫn file CSV đầu vào và 'output.csv' là file đầu ra
+input_file = '/home/binh/Workspace/data/data_science/data_finally/data_finally.csv'
+output_file = '/home/binh/Workspace/data/data_science/test/test.csv'
+label_driver(input_file, output_file)

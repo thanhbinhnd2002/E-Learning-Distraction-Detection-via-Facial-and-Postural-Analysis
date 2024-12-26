@@ -72,3 +72,5 @@ if __name__ == "__main__":
 
     # Thực hiện quá trình xử lý
     process_video_files(input_folder, openface_dir, output_folder)
+
+

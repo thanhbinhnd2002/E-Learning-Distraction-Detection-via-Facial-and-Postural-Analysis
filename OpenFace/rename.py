@@ -1,33 +1,35 @@
 import os
 import shutil
 
-# Đường dẫn đến thư mục Input
-input_folder = "/home/binh/Output"
+def rename_videos(input_folders):
+    """
+    Đổi tên các video trong thư mục theo dạng <tên_thư_mục_cha>_video_{i}, đánh số thứ tự trong mỗi thư mục.
+    Args:
+        input_folders (list): Danh sách các thư mục chứa video.
+    """
+    for folder in input_folders:
+        for root, _, files in os.walk(folder):
+            parent_folder = os.path.basename(root)
+            files = [f for f in files if f.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.csv'))]
+            files.sort()  # Đảm bảo thứ tự nhất quán
 
-# Tạo danh sách chứa đường dẫn đến tất cả các video
-video_files = []
-for root, dirs, files in os.walk(input_folder):
-    for file in files:
-        if file.lower().endswith(('.csv')):
-            video_files.append(os.path.join(root, file))
+            index = 1
+            for file in files:
+                file_path = os.path.join(root, file)
+                new_name = f"{parent_folder}_video_{index}{os.path.splitext(file)[1]}"
+                new_path = os.path.join(root, new_name)
 
-# Đường dẫn mới cho tất cả các video
-output_folder = input_folder  # Đặt tất cả video vào chung thư mục Input
-os.makedirs(output_folder, exist_ok=True)
+                try:
+                    shutil.move(file_path, new_path)
+                    print(f"Đã đổi tên: {file_path} -> {new_path}")
+                    index += 1
+                except Exception as e:
+                    print(f"Lỗi khi đổi tên file {file_path}: {e}")
 
-# Đổi tên video
-for i, video_path in enumerate(video_files):
-    # Lấy phần mở rộng của file (ví dụ: .mp4, .mkv)
-    file_extension = os.path.splitext(video_path)[1].lower()
-    # Đặt tên mới cho video
-    new_name = f"video{i + 1}{file_extension}"
-    new_path = os.path.join(output_folder, new_name)
+if __name__ == "__main__":
+    input_folders = [
+        "/home/binh/Workspace/data/data_science/data_raw_1"
+    ]
 
-    # Di chuyển và đổi tên video
-    try:
-        shutil.move(video_path, new_path)
-        print(f"Đã đổi tên: {video_path} -> {new_path}")
-    except Exception as e:
-        print(f"Lỗi khi đổi tên video {video_path}: {e}")
-
-print("Quá trình đổi tên hoàn tất.")
+    rename_videos(input_folders)
+    print("Quá trình đổi tên hoàn tất.")

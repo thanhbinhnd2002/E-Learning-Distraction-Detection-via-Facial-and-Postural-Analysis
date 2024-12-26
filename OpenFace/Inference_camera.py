@@ -1,129 +1,124 @@
 import cv2
 import numpy as np
-import joblib
-from collections import deque
+import pandas as pd
 import subprocess
-from threading import Thread
-import queue
+import os
+import joblib
 
-# === Đường dẫn đến công cụ OpenFace và các mô hình ===
-openface_path = "/home/binh/Workspace/projects/OpenFace/build/bin/FeatureExtraction"
-temp_frame_path = "temp_frame.jpg"
-temp_output_path = "processed/temp_output.csv"
-model_path = "checkpoints/model_XGBoost.pkl"
-scaler_path = "checkpoints/scaler.pkl"
+# === Đường dẫn ===
+openface_path = "/home/binh/Workspace/OpenFace/build/bin/FeatureExtraction"
+output_csv_path = "processed/output_features.csv"
+model_path = "checkpoints/model_RandomForest_2.pkl"
+scaler_path = "checkpoints/scaler_2.pkl"
+output_video_path = "./Result/video_annotated.mp4"
 
 # === Tải mô hình và scaler ===
 try:
     model = joblib.load(model_path)
     scaler = joblib.load(scaler_path)
-    print(f"Mô hình đã được tải từ: {model_path}")
-    print(f"Scaler đã được tải từ: {scaler_path}")
-except FileNotFoundError:
-    print("Lỗi: Không tìm thấy mô hình hoặc scaler. Vui lòng chạy mã huấn luyện trước!")
+    print(f"Mô hình và Scaler đã được tải thành công.")
+except FileNotFoundError as e:
+    print(f"Lỗi: {e}")
     exit(1)
 
-# === Bộ nhớ đệm và hàng đợi ===
-feature_buffer = deque(maxlen=300)  # Lưu trữ đặc trưng trong cửa sổ thời gian (10 giây, 300 frame)
-frame_queue = queue.Queue()  # Hàng đợi lưu frame từ camera
-feature_queue = queue.Queue()  # Hàng đợi lưu đặc trưng đã xử lý từ OpenFace
-
-# === Hàm trích xuất đặc trưng từ frame sử dụng OpenFace ===
-def extract_features_with_openface(frame):
+# === Hàm trích xuất đặc trưng từ video ===
+def extract_features_with_openface(video_path):
     try:
-        # Lưu frame tạm thời
-        cv2.imwrite(temp_frame_path, frame)
-
-        # Chạy OpenFace để trích xuất đặc trưng
-        command = f"{openface_path} -f {temp_frame_path} -of {temp_output_path} -2Dfp -pose -aus"
+        command = f"{openface_path} -f {video_path} -of {output_csv_path}"
         subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Đọc đặc trưng từ file CSV
-        with open(temp_output_path, "r") as file:
-            lines = file.readlines()
-            if len(lines) > 1:  # Dòng đầu là tiêu đề, cần ít nhất một dòng dữ liệu
-                features = np.array(lines[1].strip().split(",")[2:], dtype=np.float32)  # Bỏ frame và timestamp
-                return features
+        print(f"OpenFace đã hoàn thành. Kết quả lưu tại: {output_csv_path}")
+        return output_csv_path
     except subprocess.CalledProcessError as e:
-        print(f"Lỗi OpenFace: {e}")
+        print(f"Lỗi khi chạy OpenFace: {e}")
+        return None
+
+# === Hàm xử lý CSV và dự đoán ===
+def process_csv_and_predict(input_csv, scaler, model):
+    try:
+        # Đọc file CSV (dữ liệu thô từ OpenFace)
+        data = pd.read_csv(input_csv)
+
+        # Chọn các cột đặc trưng thô từ OpenFace
+        raw_columns_to_keep = ['gaze_angle_x', 'gaze_angle_y', 'pose_Rx', 'pose_Ry', 'pose_Rz',
+                               'pose_Tx', 'pose_Ty', 'pose_Tz', 'AU06_r', 'AU45_r']
+        raw_features = data[raw_columns_to_keep]
+
+        # Tính toán các đặc trưng trung bình
+        window_size = 150  # 5 giây với 30 FPS
+        processed_data = []
+
+        for i in range(0, len(raw_features) - window_size + 1, window_size):
+            window = raw_features.iloc[i:i + window_size]
+            mean_features = window.mean(axis=0)
+
+            # Chỉ sử dụng mean_features
+            processed_data.append(mean_features)
+
+        # Tạo DataFrame từ các đặc trưng đã tính toán
+        processed_df = pd.DataFrame(processed_data, columns=mean_features.index)
+
+        # Chuẩn hóa dữ liệu
+        features_scaled = scaler.transform(processed_df)
+
+        # Dự đoán
+        predictions = model.predict(features_scaled)
+        return predictions
     except Exception as e:
-        print(f"Lỗi xử lý OpenFace output: {e}")
-    return None
+        print(f"Lỗi khi xử lý CSV: {e}")
+        return None
 
-# === Luồng xử lý frame (trích xuất đặc trưng với OpenFace) ===
-def process_frame_thread():
-    while True:
-        frame = frame_queue.get()
-        if frame is None:  # Tín hiệu thoát
-            break
-
-        # Trích xuất đặc trưng từ frame
-        face_features = extract_features_with_openface(frame)
-        if face_features is not None:
-            feature_queue.put(face_features)
-
-# === Luồng dự đoán (dùng model để đưa ra kết quả) ===
-def prediction_thread():
-    while True:
-        features = feature_queue.get()
-        if features is None:  # Tín hiệu thoát
-            break
-
-        # Lưu đặc trưng vào bộ nhớ đệm
-        feature_buffer.append(features)
-
-        # Khi đủ 300 frame (10 giây), tính toán trung bình và dự đoán
-        if len(feature_buffer) == feature_buffer.maxlen:
-            mean_features = np.mean(feature_buffer, axis=0)
-            mean_features_scaled = scaler.transform([mean_features])
-            prediction = model.predict(mean_features_scaled)[0]
-
-            # Hiển thị kết quả
-            result = "Tập Trung" if prediction == 0 else "Mất Tập Trung"
-            print(f"Kết quả dự đoán: {result}")
-
-# === Vòng lặp xử lý video ===
-def process_video():
-    cap = cv2.VideoCapture(0)
-
+# === Hàm tạo video với nhãn ===
+def create_annotated_video(input_video, output_video, predictions, fps):
+    cap = cv2.VideoCapture(input_video)
     if not cap.isOpened():
-        print("Không thể mở camera. Vui lòng kiểm tra kết nối!")
+        print("Không thể mở video.")
         return
 
-    print("Camera đã bật. Nhấn 'q' để thoát.")
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    out = cv2.VideoWriter(output_video, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
-    # Tạo các luồng xử lý
-    thread_frame = Thread(target=process_frame_thread, daemon=True)
-    thread_predict = Thread(target=prediction_thread, daemon=True)
-    thread_frame.start()
-    thread_predict.start()
+    frame_count = 0
+    prediction_index = 0
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Không thể đọc frame từ camera!")
             break
 
-        # Resize frame về kích thước tiêu chuẩn
-        frame = cv2.resize(frame, (640, 480))
+        # Hiển thị nhãn trên mỗi frame
+        if prediction_index < len(predictions):
+            label = "Tập Trung" if predictions[prediction_index] == 0 else "Mất Tập Trung"
+            color = (0, 255, 0) if predictions[prediction_index] == 0 else (0, 0, 255)
+            cv2.putText(frame, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-        # Gửi frame vào hàng đợi xử lý
-        frame_queue.put(frame)
+        # Ghi frame vào video
+        out.write(frame)
 
-        # Hiển thị frame trên màn hình
-        cv2.imshow("Camera", frame)
+        frame_count += 1
+        if frame_count % 150 == 0:  # Cập nhật nhãn mỗi 150 frame (5 giây)
+            prediction_index += 1
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            print("Đang thoát chương trình...")
-            break
-
-    # Kết thúc chương trình
     cap.release()
-    cv2.destroyAllWindows()
-    frame_queue.put(None)  # Tín hiệu thoát cho luồng xử lý frame
-    feature_queue.put(None)  # Tín hiệu thoát cho luồng dự đoán
-    thread_frame.join()
-    thread_predict.join()
+    out.release()
+    print(f"Video đã được lưu tại: {output_video}")
 
+# === Hàm chính ===
 if __name__ == "__main__":
-    process_video()
+    input_video_path = "/home/binh/Workspace/data/data_science/data_raw_1/video_40/video_40_video_4.mp4" 
+    fps = 30
+
+    # Trích xuất đặc trưng
+    csv_path = extract_features_with_openface(input_video_path)
+    if csv_path is None:
+        print("Lỗi trong quá trình trích xuất đặc trưng.")
+        exit(1)
+
+    # Xử lý CSV và dự đoán
+    predictions = process_csv_and_predict(csv_path, scaler, model)
+    if predictions is None:
+        print("Lỗi trong quá trình dự đoán.")
+        exit(1)
+
+    # Tạo video với nhãn
+    create_annotated_video(input_video_path, output_video_path, predictions, fps)
