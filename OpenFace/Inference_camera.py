@@ -53,9 +53,11 @@ def process_csv_and_predict(input_csv, scaler, model):
 
             # Chỉ sử dụng mean_features
             processed_data.append(mean_features)
+        # Đặt tên cột theo format mong muốn
+        columns = [f"mean_{feat}" for feat in raw_columns_to_keep]
 
         # Tạo DataFrame từ các đặc trưng đã tính toán
-        processed_df = pd.DataFrame(processed_data, columns=mean_features.index)
+        processed_df = pd.DataFrame(processed_data, columns=columns)
 
         # Chuẩn hóa dữ liệu
         features_scaled = scaler.transform(processed_df)

@@ -139,6 +139,8 @@ if __name__ == "__main__":
 
     # Đọc dữ liệu
     X, y = load_data(args.csv_file)
+    print(X)
+    print(y)
 
     # Huấn luyện mô hình
     model = train_model(X, y, model_type=args.model_type, test_size=args.test_size,
