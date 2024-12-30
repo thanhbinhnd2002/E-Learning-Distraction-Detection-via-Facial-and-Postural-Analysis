@@ -1,85 +1,105 @@
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
-import joblib
 import subprocess
+import pandas as pd
+import numpy as np
+import joblib
+import os
 
-def run_openface_on_video(video_path, output_csv):
-    """
-    Chạy OpenFace trên toàn bộ video và lưu đặc trưng vào file CSV.
-    Args:
-        video_path (str): Đường dẫn tới file video.
-        output_csv (str): Đường dẫn file CSV đầu ra của OpenFace.
-    """
+# === Đường dẫn ===
+openface_path = "/home/binh/Workspace/OpenFace/build/bin/FeatureExtraction"
+output_csv_path = "processed/output_features.csv"
+model_path = "checkpoints/model_RandomForest_2.pkl"
+scaler_path = "checkpoints/scaler_2.pkl"
+result_csv_path = "Result/output_predictions_21_4.csv"
 
-    openface_path = "/home/binh/Workspace/projects/OpenFace/build/bin/FeatureExtraction"  # Đường dẫn đến OpenFace FeatureExtraction
+# === Tải mô hình và scaler ===
+try:
+    model = joblib.load(model_path)
+    scaler = joblib.load(scaler_path)
+    print("Mô hình và Scaler đã được tải thành công.")
+except FileNotFoundError as e:
+    print(f"Lỗi: {e}")
+    exit(1)
 
-    # Chạy OpenFace
-    command = f"{openface_path} -f {video_path} -of {output_csv} -2Dfp -pose -aus"
-    print(f"Chạy OpenFace trên video: {video_path}")
+# === Hàm trích xuất đặc trưng từ video ===
+def extract_features_with_openface(video_path):
     try:
-        subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(f"OpenFace đã hoàn thành. Kết quả được lưu tại: {output_csv}")
+        command = f"{openface_path} -f {video_path} -of {output_csv_path}"
+        subprocess.run(command, shell=True, check=True)
+        print(f"OpenFace đã hoàn thành. Kết quả lưu tại: {output_csv_path}")
+        return output_csv_path
     except subprocess.CalledProcessError as e:
         print(f"Lỗi khi chạy OpenFace: {e}")
+        return None
 
-def process_openface_csv(csv_file, scaler, model, output_csv):
-    """
-    Xử lý đặc trưng từ file CSV do OpenFace tạo ra và dự đoán trạng thái.
-    Args:
-        csv_file (str): Đường dẫn tới file CSV của OpenFace.
-        scaler: Scaler đã lưu từ huấn luyện.
-        model: Mô hình đã huấn luyện.
-        output_csv (str): Đường dẫn file kết quả đầu ra (CSV).
-    """
-    # Đọc dữ liệu từ file CSV
-    df = pd.read_csv(csv_file)
+# === Hàm xử lý CSV và dự đoán ===
+def process_csv_and_predict(input_csv, scaler, model, fps=30):
+    try:
+        # Đọc file CSV (dữ liệu thô từ OpenFace)
+        data = pd.read_csv(input_csv)
 
-    # Lọc các đặc trưng đã sử dụng khi huấn luyện
-    TRAIN_FEATURES = ["pose_Rx", "pose_Ry", "pose_Rz", "AU06_r", "AU12_r", "AU45_r"]
-    #TRAIN_FEATURES = ["face_x", "face_y", "face_z","face_h","face_con","pose_x","pose_y"]
-    features = df[TRAIN_FEATURES]
+        # Chọn các cột đặc trưng thô từ OpenFace
+        raw_columns_to_keep = ['gaze_angle_x', 'gaze_angle_y', 'pose_Rx', 'pose_Ry', 'pose_Rz',
+                               'pose_Tx', 'pose_Ty', 'pose_Tz', 'AU06_r', 'AU45_r']
+        raw_features = data[raw_columns_to_keep]
 
-    # Chuẩn hóa dữ liệu
-    features_scaled = scaler.transform(features)
+        # Tính toán các đặc trưng trung bình
+        window_size = 150  # 5 giây với 30 FPS
+        processed_data = []
+        timestamps = []
 
-    # Cửa sổ thời gian và dự đoán
-    window_size = 300  # 10 giây với 30 FPS
-    predictions = []
-    for i in range(0, len(features_scaled) - window_size + 1, window_size):
-        window = features_scaled[i:i + window_size]
-        mean_features = window.mean(axis=0)
+        for i in range(0, len(raw_features) - window_size + 1, window_size):
+            window = raw_features.iloc[i:i + window_size]
+            mean_features = window.mean(axis=0)
 
-        # Chuyển mean_features thành DataFrame với đúng tên cột
-        mean_features_df = pd.DataFrame([mean_features], columns=TRAIN_FEATURES)
+            # Lưu giá trị mean_features
+            processed_data.append(mean_features.values)
 
-        prediction = model.predict(mean_features_df.values.reshape(1, -1))[0]
+            # Lưu timestamps
+            start_time = i / fps
+            end_time = (i + window_size) / fps
+            timestamps.append((start_time, end_time))
 
-        start_time = i / 30  # Tính thời gian bắt đầu (giả sử FPS = 30)
-        end_time = (i + window_size) / 30
-        predictions.append({
-            "start_time": round(start_time, 2),
-            "end_time": round(end_time, 2),
-            "prediction": "Tập Trung" if prediction == 0 else "Mất Tập Trung"
+        # Đặt tên cột theo format mong muốn
+        columns = [f"mean_{feat}" for feat in raw_columns_to_keep]
+
+        # Tạo DataFrame từ các đặc trưng đã tính toán
+        processed_df = pd.DataFrame(processed_data, columns=columns)
+        print(f"Đã xử lý CSV. Kích thước: {processed_df}")
+        # Chuẩn hóa dữ liệu
+        features_scaled = scaler.transform(processed_df)
+        print(f"Đã chuẩn hóa dữ liệu. Kích thước: {features_scaled}")
+
+        # Dự đoán
+        predictions = model.predict(features_scaled)
+        print(f"Dự đoán: {predictions}")
+
+        # Ghi kết quả vào DataFrame
+        result_df = pd.DataFrame({
+            "Start_Time": [f"{start:.2f}s" for start, end in timestamps],
+            "End_Time": [f"{end:.2f}s" for start, end in timestamps],
+            "State": ["Tập Trung" if pred == 0 else "Mất Tập Trung" for pred in predictions]
         })
 
-    # Lưu kết quả ra file CSV
-    result_df = pd.DataFrame(predictions)
-    result_df.to_csv(output_csv, index=False)
-    print(f"Kết quả đã được lưu tại: {output_csv}")
+        # Ghi ra file CSV
+        result_df.to_csv(result_csv_path, index=False, encoding="utf-8-sig")
+        print(f"Kết quả đã được ghi vào {result_csv_path}")
+        return result_df
+    except Exception as e:
+        print(f"Lỗi khi xử lý CSV: {e}")
+        return None
 
+# === Hàm chính ===
 if __name__ == "__main__":
-    # Đường dẫn tới video và file CSV đầu ra
-    # video_path = "/home/binh/Workspace/Deeplearning4CV/data/Driver/video10.mp4"
-    video_path ="/home/binh/Workspace/projects/OpenFace/build/bin/Input/video3.mp4"
-    openface_output_csv = "processed/openface_features.csv"  # File CSV đầu ra của OpenFace
-    prediction_output_csv = "Result/predictions_output_0.csv"  # File kết quả dự đoán
+    input_video_path = "/home/binh/Workspace/data/data_science/data_raw_1/video_21/video_21_video_4.mp4"
+    fps = 30  # Frame rate của video (FPS)
 
-    # Chạy OpenFace để trích xuất đặc trưng
-    run_openface_on_video(video_path, openface_output_csv)
+    # Trích xuất đặc trưng
+    csv_path = extract_features_with_openface(input_video_path)
+    if csv_path is None:
+        print("Lỗi trong quá trình trích xuất đặc trưng.")
+        exit(1)
 
-    # Tải scaler và model
-    scaler = joblib.load("checkpoints/scaler.pkl")
-    model = joblib.load("checkpoints/model_XGBoost.pkl")
-
-    # Xử lý file CSV từ OpenFace và dự đoán
-    process_openface_csv(openface_output_csv, scaler, model, prediction_output_csv)
+    # Xử lý CSV và dự đoán
+    result = process_csv_and_predict(csv_path, scaler, model, fps)
+    if result is not None:
+        print(result.head())

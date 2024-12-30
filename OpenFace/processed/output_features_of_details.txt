@@ -1,5 +1,5 @@
-Input:/home/binh/Workspace/data/data_science/data_raw_1/video_40/video_40_video_4.mp4
-Input full path:/home/binh/Workspace/data/data_science/data_raw_1/video_40/video_40_video_4.mp4
+Input:/home/binh/Workspace/data/data_science/data_raw_1/video_29/video_29_video_2.mp4
+Input full path:/home/binh/Workspace/data/data_science/data_raw_1/video_29/video_29_video_2.mp4
 Camera parameters:1312.5,1312.5,960,540
 Output HOG:output_features.hog
 Output video:output_features.avi

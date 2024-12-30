@@ -10,7 +10,7 @@ openface_path = "/home/binh/Workspace/OpenFace/build/bin/FeatureExtraction"
 output_csv_path = "processed/output_features.csv"
 model_path = "checkpoints/model_RandomForest_2.pkl"
 scaler_path = "checkpoints/scaler_2.pkl"
-output_video_path = "./Result/video_annotated.mp4"
+output_video_path = "./Result/video_annotated_29_2.mp4"
 
 # === Tải mô hình và scaler ===
 try:
@@ -52,18 +52,19 @@ def process_csv_and_predict(input_csv, scaler, model):
             mean_features = window.mean(axis=0)
 
             # Chỉ sử dụng mean_features
-            processed_data.append(mean_features)
+            processed_data.append(mean_features.tolist())
         # Đặt tên cột theo format mong muốn
         columns = [f"mean_{feat}" for feat in raw_columns_to_keep]
 
         # Tạo DataFrame từ các đặc trưng đã tính toán
         processed_df = pd.DataFrame(processed_data, columns=columns)
-
+        print(f"Đã xử lý CSV. Kích thước: {processed_df}")
         # Chuẩn hóa dữ liệu
         features_scaled = scaler.transform(processed_df)
-
+        print(f"Đã chuẩn hóa dữ liệu. Kích thước: {features_scaled}")
         # Dự đoán
         predictions = model.predict(features_scaled)
+        print(f"Dự đoán: {predictions}")
         return predictions
     except Exception as e:
         print(f"Lỗi khi xử lý CSV: {e}")
@@ -90,7 +91,7 @@ def create_annotated_video(input_video, output_video, predictions, fps):
 
         # Hiển thị nhãn trên mỗi frame
         if prediction_index < len(predictions):
-            label = "Tập Trung" if predictions[prediction_index] == 0 else "Mất Tập Trung"
+            label = "Undistracted" if predictions[prediction_index] == 0 else "Distracted"
             color = (0, 255, 0) if predictions[prediction_index] == 0 else (0, 0, 255)
             cv2.putText(frame, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
@@ -107,7 +108,7 @@ def create_annotated_video(input_video, output_video, predictions, fps):
 
 # === Hàm chính ===
 if __name__ == "__main__":
-    input_video_path = "/home/binh/Workspace/data/data_science/data_raw_1/video_40/video_40_video_4.mp4" 
+    input_video_path = "/home/binh/Workspace/data/data_science/data_raw_1/video_29/video_29_video_2.mp4" 
     fps = 30
 
     # Trích xuất đặc trưng
