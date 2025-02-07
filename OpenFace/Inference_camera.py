@@ -10,7 +10,7 @@ openface_path = "/home/binh/Workspace/OpenFace/build/bin/FeatureExtraction"
 output_csv_path = "processed/output_features.csv"
 model_path = "checkpoints/model_RandomForest_2.pkl"
 scaler_path = "checkpoints/scaler_2.pkl"
-output_video_path = "./Result/video_annotated_29_2.mp4"
+output_video_path = "./Result/video_annotated_16_3.mp4"
 
 # === Tải mô hình và scaler ===
 try:
@@ -108,7 +108,7 @@ def create_annotated_video(input_video, output_video, predictions, fps):
 
 # === Hàm chính ===
 if __name__ == "__main__":
-    input_video_path = "/home/binh/Workspace/data/data_science/data_raw_1/video_29/video_29_video_2.mp4" 
+    input_video_path = "/home/binh/Workspace/data/data_science/data_raw_1/video_16/video_16_video_3.mp4" 
     fps = 30
 
     # Trích xuất đặc trưng

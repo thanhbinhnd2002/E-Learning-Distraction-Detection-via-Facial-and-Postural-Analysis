@@ -6,7 +6,6 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-
 def get_csv_files(folder_path):
     """
     Tìm tất cả các tệp CSV trong thư mục đầu vào.
@@ -20,7 +19,6 @@ def get_csv_files(folder_path):
         for root, _, files in os.walk(folder_path)
         for file in files if file.lower().endswith('.csv')
     ]
-
 
 def preprocess_csv(file_path, columns_to_keep, contamination=0.01):
     """
@@ -38,6 +36,9 @@ def preprocess_csv(file_path, columns_to_keep, contamination=0.01):
         # Kiểm tra các cột yêu cầu
         if not all(col in df.columns for col in columns_to_keep):
             print(f"Bỏ qua file {file_path} do thiếu cột cần thiết.")
+            # in cột còn thiếu
+            missing_cols = [col for col in columns_to_keep if col not in df.columns]
+            print(f"Các cột thiếu: {missing_cols}")
             return None
 
         # Lọc các cột cần thiết
@@ -58,16 +59,15 @@ def preprocess_csv(file_path, columns_to_keep, contamination=0.01):
         print(f"Lỗi khi xử lý file {file_path}: {e}")
         return None
 
-
-def extract_window_features(df, video_name, window_size=150):
+def extract_window_features(df, video_name, window_size=300):
     """
-    Tính toán đặc trưng (mean) từ một cửa sổ thời gian và thêm cột tên video.
+    Tính toán đặc trưng (mean, max, min, std) từ một cửa sổ thời gian và thêm cột tên video.
     Args:
         df (pd.DataFrame): DataFrame đã tiền xử lý.
         video_name (str): Tên video tương ứng.
         window_size (int): Kích thước cửa sổ (số khung hình).
     Returns:
-        pd.DataFrame: DataFrame chứa đặc trưng (mean) và tên video.
+        pd.DataFrame: DataFrame chứa đặc trưng (mean, max, min, std) và tên video.
     """
     features = df.columns[2:]  # Giả định bỏ cột frame, timestamp
     processed_data = []
@@ -75,16 +75,23 @@ def extract_window_features(df, video_name, window_size=150):
     for i in range(0, len(df) - window_size + 1, window_size):
         window = df.iloc[i:i + window_size][features]
         mean_features = window.mean().values
+        max_features = window.max().values
+        min_features = window.min().values
+        std_features = window.std().values
 
-        # Chỉ sử dụng mean
-        processed_data.append(mean_features)
+        combined_features = np.concatenate([mean_features, max_features, min_features, std_features])
+        processed_data.append(combined_features)
 
-    # Tạo tên cột cho mean
-    columns = [f"mean_{feat}" for feat in features]
+    # Tạo tên cột cho mean, max, min, std
+    columns = (
+        [f"mean_{feat}" for feat in features] +
+        [f"max_{feat}" for feat in features] +
+        [f"min_{feat}" for feat in features] +
+        [f"std_{feat}" for feat in features]
+    )
     result_df = pd.DataFrame(processed_data, columns=columns)
     result_df["video_name"] = video_name  # Thêm tên video vào mỗi dòng
     return result_df
-
 
 def save_processed_data(dataframes, output_file):
     """
@@ -99,7 +106,6 @@ def save_processed_data(dataframes, output_file):
         print(f"Dữ liệu đã được lưu tại {output_file}.")
     else:
         print("Không có dữ liệu nào để lưu.")
-
 
 def preprocess_all(input_folder, output_file, columns_to_keep, window_size=150):
     """
@@ -128,17 +134,18 @@ def preprocess_all(input_folder, output_file, columns_to_keep, window_size=150):
 
     save_processed_data(all_data, output_file)
 
-
 if __name__ == "__main__":
-    input_folder = "/home/binh/Workspace/data/data_science/data_extract_1"
-    output_file = "/home/binh/Workspace/data/data_science/test/test_3.csv"
+    input_folder = "/media/binh/New Volume/Binh/data/DAiSEE/DAiSEE/Features"
+    output_file = "/home/binh/Workspace/data/data_science/data_finally/Daisee.csv"
     columns = [
         'frame', 'timestamp',
         'gaze_0_x', 'gaze_0_y', 'gaze_0_z', 'gaze_1_x', 'gaze_1_y', 'gaze_1_z', 'gaze_angle_x', 'gaze_angle_y',
         'pose_Rx', 'pose_Ry', 'pose_Rz', 'pose_Tx', 'pose_Ty', 'pose_Tz',
-        'AU06_r', 'AU10_r', 'AU12_r', 'AU14_r', 'AU15_r', 'AU_17_r', 'AU20_r', 'AU25_r', 'AU23_r', 'AU26_r',
-        'AU45_r', 'AU01_r', 'AU02_r', 'AU03_r', 'AU04_r', 'AU05_r', 'AU07_r'
-        ]
+        'AU06_r', 'AU10_r', 'AU12_r', 'AU14_r', 'AU15_r', 'AU17_r', 'AU20_r', 'AU25_r', 'AU23_r', 'AU26_r',
+        'AU45_r', 'AU01_r', 'AU02_r', 'AU04_r', 'AU05_r', 'AU07_r'
+    ]
+    
+    
 
-    columns_to_keep = ['frame', 'timestamp', 'gaze_angle_x', 'gaze_angle_y','pose_Rx', 'pose_Ry', 'pose_Rz','pose_Tx', 'pose_Ty', 'pose_Tz','AU06_r','AU45_r']
-    preprocess_all(input_folder, output_file, columns_to_keep)
+    preprocess_all(input_folder, output_file, columns)
+

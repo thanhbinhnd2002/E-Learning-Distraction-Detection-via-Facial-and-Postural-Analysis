@@ -1,29 +1,26 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Đọc dữ liệu
-data = pd.read_csv("processed/output_features.csv")
+# Đường dẫn đến file CSV đã merge
+merged_csv_path = "/home/binh/Workspace/data/data_science/data_finally/output_merged.csv"  # Thay bằng đường dẫn thật
 
-# Chọn các cột cần thiết
-raw_columns_to_keep = ['gaze_angle_x', 'gaze_angle_y', 'pose_Rx', 'pose_Ry', 'pose_Rz',
-                       'pose_Tx', 'pose_Ty', 'pose_Tz', 'AU06_r', 'AU45_r']
-raw_features = data[raw_columns_to_keep]
+# Đọc file CSV
+merged_df = pd.read_csv(merged_csv_path)
 
-# Tính toán các đặc trưng trung bình
-window_size = 150  # 5 giây với 30 FPS
-processed_data = []
+# Kiểm tra xem cột "engagement" có tồn tại không
+if 'Engagement' not in merged_df.columns:
+    print("Cột 'engagement' không tồn tại trong file CSV.")
+else:
+    # In phân phối cơ bản (giá trị đếm)
+    print("Phân phối của cột engagement:")
+    print(merged_df['Engagement'].value_counts())
 
-for i in range(0, len(raw_features) - window_size + 1, window_size):
-    window = raw_features.iloc[i:i + window_size]
-    mean_features = window.mean(axis=0)
-
-    # Append giá trị của mean_features dưới dạng danh sách
-    processed_data.append(mean_features.tolist())
-
-# Đặt tên cột theo format mong muốn
-columns = [f"mean_{feat}" for feat in raw_columns_to_keep]
-
-# Tạo DataFrame từ các đặc trưng đã tính toán
-processed_df = pd.DataFrame(processed_data, columns=columns)
-
-# Hiển thị kết quả
-print(processed_df)
+    # Vẽ biểu đồ phân phối
+    plt.figure(figsize=(10, 6))
+    sns.histplot(merged_df['Engagement'], bins=20, kde=True, color='blue')
+    plt.title("Phân phối của cột Engagement", fontsize=16)
+    plt.xlabel("Giá trị Engagement", fontsize=12)
+    plt.ylabel("Tần suất", fontsize=12)
+    plt.grid(axis='y')
+    plt.show()

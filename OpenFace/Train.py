@@ -125,7 +125,7 @@ def train_model(X, y, model_type="RandomForest", test_size=0.2, random_state=43,
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a machine learning model for classification")
     parser.add_argument("--csv_file", type=str, default="/home/binh/Workspace/data/data_science/test/test_3.csv", help="Path to the input CSV file")
-    parser.add_argument("--model_type", type=str, default="RandomForest",
+    parser.add_argument("--model_type", type=str, default="SVM",
                         choices=["RandomForest", "XGBoost", "SVM", "Decision Tree", "KNN"],
                         help="Type of model to train")
     parser.add_argument("--test_size", type=float, default=0.2, help="Proportion of test data")

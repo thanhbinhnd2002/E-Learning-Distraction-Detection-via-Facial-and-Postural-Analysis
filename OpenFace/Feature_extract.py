@@ -14,7 +14,7 @@ def find_video_files(input_folder):
     video_files = []
     for root, dirs, files in os.walk(input_folder):
         for file in files:
-            if file.lower().endswith(('.mp4', '.avi', '.mov','.mkv')):  # Có thể thêm các định dạng khác
+            if file.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):  # Có thể thêm các định dạng khác
                 video_files.append(os.path.join(root, file))
     return video_files
 
@@ -30,7 +30,7 @@ def run_openface_on_video(video_path, openface_dir, output_folder):
     Returns:
     - str: Đường dẫn đến file CSV đầu ra.
     """
-    output_file = os.path.join(output_folder, os.path.basename(video_path).replace('.mp4', '.csv'))
+    output_file = os.path.join(output_folder, os.path.basename(video_path).replace('.avi', '.csv'))
     command = [
         os.path.join(openface_dir, 'bin', 'FeatureExtraction'),
         '-f', video_path,
@@ -66,11 +66,15 @@ def process_video_files(input_folder, openface_dir, output_folder):
 
 
 if __name__ == "__main__":
-    input_folder = "/home/binh/Downloads"
-    openface_dir = "/home/binh/Workspace/projects/OpenFace/build/"
-    output_folder = "/home/binh/Output"
+    # Đường dẫn đến thư mục Train trong bộ dữ liệu DAiSEE
+    input_folder = "/media/binh/New Volume/Binh/data/DAiSEE/DAiSEE/DataSet/Train"
+    # Đường dẫn đến thư mục OpenFace
+    openface_dir = "/home/binh/Workspace/OpenFace/build"
+    # Đường dẫn đến thư mục lưu trữ kết quả
+    output_folder = "/media/binh/New Volume/Binh/data/DAiSEE/DAiSEE/Features"
+
+    # Kiểm tra và tạo thư mục lưu kết quả nếu chưa tồn tại
+    os.makedirs(output_folder, exist_ok=True)
 
     # Thực hiện quá trình xử lý
     process_video_files(input_folder, openface_dir, output_folder)
-
-
